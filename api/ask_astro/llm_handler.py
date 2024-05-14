@@ -16,27 +16,27 @@ from ask_astro.settings import (
 
 
 # enum with all possible categories
-LLM_CATEGORY = Enum(
-    "MULTI_QUERY_RETRIEVER",
-    "CONVERSATIONAL_RETRIEVAL_LLM_CHAIN",
-    "CONVERSATIONAL_RETRIEVAL_LOAD_QA_CHAIN",
-)
+class LLM_CATEGORY(Enum):
+    MULTI_QUERY_RETRIEVER = 1
+    CONVERSATIONAL_RETRIEVAL_LLM_CHAIN = 2
+    CONVERSATIONAL_RETRIEVAL_LOAD_QA_CHAIN = 3
 
 
 def azure_available():
-    east_key = os.getenv("AZURE_OPENAI_USEAST_PARAMS", "<>")
-    east2_key = os.getenv("AZURE_OPENAI_USEAST2_PARAMS", "<>")
-    return "<>" not in east_key and "<>" not in east2_key
+    east_key = os.getenv("AZURE_OPENAI_USEAST_PARAMS", "< >")
+    east2_key = os.getenv("AZURE_OPENAI_USEAST2_PARAMS", "< >")
+    print("east_key", east_key, "east2_key", east2_key)
+    return "< >" not in east_key and "< >" not in east2_key
 
 
 def openai_available():
-    api_key = os.getenv("OPENAI_API_KEY", "<>")
-    return "<>" not in api_key
+    api_key = os.getenv("OPENAI_API_KEY", "< >")
+    return "< >" not in api_key
 
 
 def cohere_available():
-    api_key = os.getenv("COHERE_API_KEY", "<>")
-    return "<>" not in api_key
+    api_key = os.getenv("COHERE_API_KEY", "< >")
+    return "< >" not in api_key
 
 
 class BaseLLMSelector:
@@ -69,9 +69,10 @@ class AzureSelector(BaseLLMSelector):
             )
 
         parameters = self.parameters_per_category[category].copy()
+        parameters.update(AzureOpenAIParams.us_east2)
         parameters.update(kwargs)
 
-        return AzureChatOpenAI(AzureOpenAIParams(**parameters))
+        return AzureChatOpenAI(**parameters)
 
 
 class OpenAISelector(BaseLLMSelector):

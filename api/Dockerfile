@@ -26,6 +26,7 @@ COPY . .
 
 # GCP credential for local dev
 COPY gcp.json ./
+RUN pip install langchain-openai
 
 EXPOSE 8080
 ENTRYPOINT python -m ask_astro.app

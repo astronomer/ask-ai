@@ -7,7 +7,6 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
-langchain-openai = "^0.1.6"
 
 [tool.poetry.group.dev.dependencies]
 invoke = "^2.2.0"
