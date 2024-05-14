@@ -25,7 +25,7 @@ COPY --from=builder $VIRTUAL_ENV $VIRTUAL_ENV
 COPY . .
 
 # GCP credential for local dev
-# COPY gcp.json ./
+COPY gcp.json ./
 
 EXPOSE 8080
 ENTRYPOINT python -m ask_astro.app

@@ -20,14 +20,10 @@ from ask_astro.chains.custom_llm_filter_prompt import custom_llm_chain_filter_pr
 from ask_astro.chains.custom_llm_output_lines_parser import CustomLineListOutputParser
 from ask_astro.clients.weaviate_ import client
 from ask_astro.config import AzureOpenAIParams, CohereConfig, WeaviateConfig
-from ask_astro.settings import (
-    CONVERSATIONAL_RETRIEVAL_LLM_CHAIN_DEPLOYMENT_NAME,
-    CONVERSATIONAL_RETRIEVAL_LLM_CHAIN_TEMPERATURE,
-    CONVERSATIONAL_RETRIEVAL_LOAD_QA_CHAIN_DEPLOYMENT_NAME,
-    CONVERSATIONAL_RETRIEVAL_LOAD_QA_CHAIN_TEMPERATURE,
-    MULTI_QUERY_RETRIEVER_DEPLOYMENT_NAME,
-    MULTI_QUERY_RETRIEVER_TEMPERATURE,
-)
+
+
+from ask_astro.llm_handler import LLMSelector, LLM_CATEGORY, CompressorSelector
+
 
 with open("ask_astro/templates/combine_docs_sys_prompt_webapp.txt") as webapp_system_prompt_fd:
     """Load system prompt template for webapp messages"""
@@ -68,11 +64,7 @@ user_question_rewording_prompt_template = PromptTemplate(
     questions separated by newlines. Original question: {question}""",
 )
 multi_query_retriever = MultiQueryRetriever.from_llm(
-    llm=AzureChatOpenAI(
-        **AzureOpenAIParams.us_east2,
-        deployment_name=MULTI_QUERY_RETRIEVER_DEPLOYMENT_NAME,
-        temperature=MULTI_QUERY_RETRIEVER_TEMPERATURE,
-    ),
+    llm=LLMSelector().get_llm(LLM_CATEGORY.MULTI_QUERY_RETRIEVER),
     include_original=True,
     prompt=user_question_rewording_prompt_template,
     retriever=hybrid_retriever,
@@ -81,20 +73,17 @@ multi_query_retriever = MultiQueryRetriever.from_llm(
 multi_query_retriever.llm_chain.output_parser = CustomLineListOutputParser(max_lines=2)
 
 # Rerank
-cohere_reranker_compressor = CohereRerank(user_agent="langchain", top_n=CohereConfig.rerank_top_n)
+compressor = CompressorSelector().get_compressor()
 reranker_retriever = ContextualCompressionRetriever(
-    base_compressor=cohere_reranker_compressor, base_retriever=multi_query_retriever
+    base_compressor=compressor, base_retriever=multi_query_retriever
 )
 
 # GPT-3.5 to check over relevancy of the remaining documents
 llm_chain_filter = LLMChainFilter.from_llm(
-    AzureChatOpenAI(
-        **AzureOpenAIParams.us_east2,
-        deployment_name=CONVERSATIONAL_RETRIEVAL_LLM_CHAIN_DEPLOYMENT_NAME,
-        temperature=0.0,
-    ),
+    LLMSelector().get_llm(LLM_CATEGORY.CONVERSATIONAL_RETRIEVAL_LLM_CHAIN, temperature=0.0),
     custom_llm_chain_filter_prompt_template,
 )
+
 llm_chain_filter_compression_retriever = ContextualCompressionRetriever(
     base_compressor=llm_chain_filter, base_retriever=reranker_retriever
 )
@@ -104,19 +93,11 @@ webapp_answer_question_chain = ConversationalRetrievalChain(
     retriever=llm_chain_filter_compression_retriever,
     return_source_documents=True,
     question_generator=LLMChain(
-        llm=AzureChatOpenAI(
-            **AzureOpenAIParams.us_east2,
-            deployment_name=CONVERSATIONAL_RETRIEVAL_LLM_CHAIN_DEPLOYMENT_NAME,
-            temperature=CONVERSATIONAL_RETRIEVAL_LLM_CHAIN_TEMPERATURE,
-        ),
+        llm=LLMSelector().get_llm(LLM_CATEGORY.CONVERSATIONAL_RETRIEVAL_LLM_CHAIN),
         prompt=CONDENSE_QUESTION_PROMPT,
     ),
     combine_docs_chain=load_qa_chain(
-        AzureChatOpenAI(
-            **AzureOpenAIParams.us_east2,
-            deployment_name=CONVERSATIONAL_RETRIEVAL_LOAD_QA_CHAIN_DEPLOYMENT_NAME,
-            temperature=CONVERSATIONAL_RETRIEVAL_LOAD_QA_CHAIN_TEMPERATURE,
-        ),
+        LLMSelector().get_llm(LLM_CATEGORY.CONVERSATIONAL_RETRIEVAL_LOAD_QA_CHAIN),
         chain_type="stuff",
         prompt=ChatPromptTemplate.from_messages(webapp_messages),
     ),
@@ -126,19 +107,11 @@ slack_answer_question_chain = ConversationalRetrievalChain(
     retriever=llm_chain_filter_compression_retriever,
     return_source_documents=True,
     question_generator=LLMChain(
-        llm=AzureChatOpenAI(
-            **AzureOpenAIParams.us_east2,
-            deployment_name=CONVERSATIONAL_RETRIEVAL_LLM_CHAIN_DEPLOYMENT_NAME,
-            temperature=CONVERSATIONAL_RETRIEVAL_LLM_CHAIN_TEMPERATURE,
-        ),
+        llm=LLMSelector().get_llm(LLM_CATEGORY.CONVERSATIONAL_RETRIEVAL_LLM_CHAIN),
         prompt=CONDENSE_QUESTION_PROMPT,
     ),
     combine_docs_chain=load_qa_chain(
-        AzureChatOpenAI(
-            **AzureOpenAIParams.us_east2,
-            deployment_name=CONVERSATIONAL_RETRIEVAL_LOAD_QA_CHAIN_DEPLOYMENT_NAME,
-            temperature=CONVERSATIONAL_RETRIEVAL_LOAD_QA_CHAIN_TEMPERATURE,
-        ),
+        LLMSelector().get_llm(LLM_CATEGORY.CONVERSATIONAL_RETRIEVAL_LOAD_QA_CHAIN),
         chain_type="stuff",
         prompt=ChatPromptTemplate.from_messages(slack_messages),
     ),
